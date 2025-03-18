@@ -24,25 +24,32 @@ terraform {
 data "azurerm_client_config" "current" {}
 
 # Create Azure AD Application for Grafana Cloud
-resource "azuread_application" "grafana" {
-  display_name = "grafana-cloud-azure-metrics-integration"
-}
+#the following 4 blocks need application administrator permissions as per https://stackoverflow.com/questions/76423517/serviceprincipalsclient-baseclient-post-unexpected-status-403-with-odata-erro
+# resource "azuread_application" "grafana" {
+#   display_name = "grafana-cloud-azure-metrics-int"
+#   owners       = [data.azurerm_client_config.current.object_id]
+# }
 
-# Create Azure AD Service Principal for Grafana Cloud
-resource "azuread_service_principal" "grafana" {
-  client_id = azuread_application.grafana.client_id
-}
+# resource "azuread_service_principal" "grafana" {
+#   client_id = azuread_application.grafana.client_id
+#   use_existing = true
+# }
 
-# Create Service Principal password
-resource "azuread_service_principal_password" "grafana" {
-  service_principal_id = azuread_service_principal.grafana.id
-}
+# # Assign Monitoring Reader role to the Service Principal
+# resource "azurerm_role_assignment" "grafana" {
+#   scope                = "/subscriptions/${var.azure_subscription_id}"
+#   role_definition_name = "Monitoring Reader"
+#   principal_id         = azuread_service_principal.grafana.id
+# }
 
-# Assign Monitoring Reader role to the Service Principal
-resource "azurerm_role_assignment" "grafana" {
-  scope                = "/subscriptions/${var.azure_subscription_id}"
-  role_definition_name = "Monitoring Reader"
-  principal_id         = azuread_service_principal.grafana.id
+# # Create Service Principal password
+# resource "azuread_service_principal_password" "grafana" {
+#   service_principal_id = azuread_service_principal.grafana.id
+# }
+
+# Get existing Azure AD Application
+data "azuread_application" "grafana" {
+  display_name = "grafana-cloud-azure-metric-integration"
 }
 
 # Configure provider for Azure integration
@@ -62,10 +69,13 @@ resource "grafana_cloud_provider_azure_credential" "azurecred" {
   stack_id = data.grafana_cloud_stack.stack.id
   name = "azure-credential"
 
-  client_id = azuread_application.grafana.client_id
-  client_secret = azuread_service_principal_password.grafana.value
+  client_id = data.azuread_application.grafana.client_id
+  client_secret = var.azure_app_registration_client_secret
   tenant_id = data.azurerm_client_config.current.tenant_id
 }
+
+
+
 
 
 
